@@ -9,6 +9,7 @@ import type { Category, Transaction } from '@/lib/types'
 import { Button } from '@/components/ui/button'
 import { AddTransactionDialog } from '@/components/transactions/add-transaction-dialog'
 import { DonutChart } from '@/components/charts/donut-chart'
+import { usePrivacyMode } from '@/lib/privacy-mode'
 import Link from 'next/link'
 
 interface MonthlyIncome {
@@ -55,6 +56,8 @@ export default function DashboardPage() {
   const [expenseSort, setExpenseSort] = useState<SortOrder>('desc')
   const [allocationSort, setAllocationSort] = useState<SortOrder>('desc')
   const [expenseListSort, setExpenseListSort] = useState<SortOrder>('desc')
+  const { privacyMode } = usePrivacyMode()
+  const blur = privacyMode ? 'blur select-none transition-all duration-200' : 'transition-all duration-200'
 
   const supabase = createClient()
 
@@ -190,7 +193,7 @@ export default function DashboardPage() {
             ].map(({ label, value, color }) => (
               <div key={label} className="bg-[#111827] border border-white/8 rounded-2xl px-5 py-4">
                 <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">{label}</p>
-                <p className={`text-2xl font-bold ${color}`}>{formatCurrency(value)}</p>
+                <p className={`text-2xl font-bold ${color} ${blur}`}>{formatCurrency(value)}</p>
               </div>
             ))}
           </div>
@@ -204,7 +207,7 @@ export default function DashboardPage() {
                 <SortButtons value={expenseSort} onChange={setExpenseSort} />
               </div>
               <p className="text-xs text-slate-500 mb-3">Where your spending goes</p>
-              <DonutChart data={expenseDonutData} centerLabel="Total" centerValue={formatCurrency(totalExpenses)} />
+              <DonutChart data={expenseDonutData} centerLabel="Total" centerValue={privacyMode ? '•••' : formatCurrency(totalExpenses)} />
               <div className="mt-3 space-y-2">
                 {sortItems(expenseDonutData.filter(d => d.value > 0), expenseSort).map(d => (
                   <div key={d.name} className="flex items-center justify-between">
@@ -213,10 +216,10 @@ export default function DashboardPage() {
                       <span className="text-xs text-slate-400">{d.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">
+                      <span className={`text-xs text-slate-500 ${blur}`}>
                         {txExpenses > 0 ? Math.round((d.value / txExpenses) * 100) : 0}%
                       </span>
-                      <span className="text-xs font-semibold text-white">{formatCurrency(d.value)}</span>
+                      <span className={`text-xs font-semibold text-white ${blur}`}>{formatCurrency(d.value)}</span>
                     </div>
                   </div>
                 ))}
@@ -230,7 +233,7 @@ export default function DashboardPage() {
                 <SortButtons value={allocationSort} onChange={setAllocationSort} />
               </div>
               <p className="text-xs text-slate-500 mb-3">Where your paycheck goes</p>
-              <DonutChart data={allocationDonutData} centerLabel="Income" centerValue={formatCurrency(earnings)} />
+              <DonutChart data={allocationDonutData} centerLabel="Income" centerValue={privacyMode ? '•••' : formatCurrency(earnings)} />
               <div className="mt-3 space-y-2">
                 {sortItems(allocationDonutData.filter(d => d.value > 0), allocationSort).map(d => (
                   <div key={d.name} className="flex items-center justify-between">
@@ -239,10 +242,10 @@ export default function DashboardPage() {
                       <span className="text-xs text-slate-400 truncate max-w-24">{d.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">
+                      <span className={`text-xs text-slate-500 ${blur}`}>
                         {earnings > 0 ? Math.round((d.value / earnings) * 100) : 0}%
                       </span>
-                      <span className="text-xs font-semibold text-white">{formatCurrency(d.value)}</span>
+                      <span className={`text-xs font-semibold text-white ${blur}`}>{formatCurrency(d.value)}</span>
                     </div>
                   </div>
                 ))}
@@ -261,7 +264,7 @@ export default function DashboardPage() {
                   <div className="px-5 py-3 border-b border-white/6">
                     <div className="flex justify-between mb-2">
                       <Link href={`/categories/${foodParent.id}`} className="text-sm text-slate-300 hover:text-blue-400 transition-colors">Food</Link>
-                      <span className="text-sm font-semibold text-white">
+                      <span className={`text-sm font-semibold text-white ${blur}`}>
                         {formatCurrency(foodChildren.reduce((s, c) => s + (grouped.get(c.id)?.total ?? 0), 0))}
                       </span>
                     </div>
@@ -269,7 +272,7 @@ export default function DashboardPage() {
                       {foodChildren.map(c => (
                         <div key={c.id} className="bg-white/4 rounded-xl p-2.5">
                           <p className="text-xs text-slate-500">{c.name}</p>
-                          <p className="text-sm font-bold text-white mt-0.5">{formatCurrency(grouped.get(c.id)?.total ?? 0)}</p>
+                          <p className={`text-sm font-bold text-white mt-0.5 ${blur}`}>{formatCurrency(grouped.get(c.id)?.total ?? 0)}</p>
                         </div>
                       ))}
                     </div>
@@ -281,7 +284,7 @@ export default function DashboardPage() {
                     <div key={cat.id} className="px-5 py-2.5 border-b border-white/6 last:border-0">
                       <div className="flex justify-between mb-1">
                         <Link href={`/categories/${cat.id}`} className="text-xs text-slate-300 hover:text-blue-400 transition-colors">{cat.name}</Link>
-                        <span className="text-xs font-semibold text-white">{formatCurrency(total)}</span>
+                        <span className={`text-xs font-semibold text-white ${blur}`}>{formatCurrency(total)}</span>
                       </div>
                       <div className="h-1 bg-white/5 rounded-full overflow-hidden">
                         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cat.color ?? '#4f87ff' }} />
@@ -303,12 +306,12 @@ export default function DashboardPage() {
                 ].map(({ label, value, color }) => (
                   <div key={label} className="px-5 py-2.5 border-b border-white/6 flex justify-between">
                     <span className="text-xs text-slate-300">{label}</span>
-                    <span className={`text-xs font-bold ${color}`}>{formatCurrency(value)}</span>
+                    <span className={`text-xs font-bold ${color} ${blur}`}>{formatCurrency(value)}</span>
                   </div>
                 ))}
                 <div className="px-5 py-2.5 flex justify-between">
                   <span className="text-xs text-slate-500">Paycheck Savings</span>
-                  <span className={`text-xs font-bold ${paycheckSavings >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-xs font-bold ${paycheckSavings >= 0 ? 'text-emerald-400' : 'text-red-400'} ${blur}`}>
                     {formatCurrency(paycheckSavings)}
                   </span>
                 </div>
@@ -333,7 +336,7 @@ export default function DashboardPage() {
                           <p className="text-xs text-slate-600">{format(new Date(tx.date + 'T00:00:00'), 'MMM d')}</p>
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-white shrink-0 ml-2">{formatCurrency(tx.amount)}</span>
+                      <span className={`text-xs font-bold text-white shrink-0 ml-2 ${blur}`}>{formatCurrency(tx.amount)}</span>
                     </div>
                   )
                 })}

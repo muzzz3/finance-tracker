@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, ArrowLeftRight, BarChart2, LogOut, TrendingUp, Landmark, ShoppingBag, Wallet, Repeat2 } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, BarChart2, LogOut, TrendingUp, Landmark, ShoppingBag, Wallet, Repeat2, Eye, EyeOff } from 'lucide-react'
+import { usePrivacyMode } from '@/lib/privacy-mode'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -19,6 +20,7 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const { privacyMode, toggle } = usePrivacyMode()
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -65,8 +67,20 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Sign out */}
-      <div className="px-3 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* Privacy + sign out */}
+      <div className="px-3 py-4 space-y-0.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <button
+          onClick={toggle}
+          className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium transition-all duration-150 hover:bg-white/4"
+          style={{ color: privacyMode ? '#60a5fa' : '' }}
+        >
+          {privacyMode
+            ? <EyeOff className="w-4 h-4 shrink-0 text-blue-400" />
+            : <Eye className="w-4 h-4 shrink-0 text-slate-400" />}
+          <span className={privacyMode ? 'text-blue-400' : 'text-slate-400 hover:text-white'}>
+            {privacyMode ? 'Show numbers' : 'Hide numbers'}
+          </span>
+        </button>
         <button
           onClick={handleSignOut}
           className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-slate-400 hover:text-white transition-all duration-150 hover:bg-white/4"
