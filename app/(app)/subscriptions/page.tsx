@@ -19,11 +19,17 @@ interface Subscription {
   next_billing_date: string | null
   color: string | null
   active: boolean
+  group_name: string | null
 }
 
 const COLORS = [
   '#60a5fa', '#34d399', '#f59e0b', '#f87171', '#a78bfa',
   '#fb923c', '#e879f9', '#94a3b8', '#38bdf8', '#4ade80',
+]
+
+const SUGGESTED_GROUPS = [
+  'Credit Cards', 'Entertainment', 'Food', 'Gaming',
+  'Health & Fitness', 'Home', 'Shopping', 'Software & Tools',
 ]
 
 const monthlyAmount = (s: Subscription) =>
@@ -41,6 +47,7 @@ export default function SubscriptionsPage() {
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [nextDate, setNextDate] = useState('')
   const [color, setColor] = useState(COLORS[0])
+  const [groupName, setGroupName] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -61,7 +68,7 @@ export default function SubscriptionsPage() {
 
   function openAdd() {
     setEditing(null)
-    setName(''); setAmount(''); setCycle('monthly'); setNextDate(''); setColor(COLORS[0]); setError('')
+    setName(''); setAmount(''); setCycle('monthly'); setNextDate(''); setColor(COLORS[0]); setGroupName(''); setError('')
     setDialogOpen(true)
   }
 
@@ -72,6 +79,7 @@ export default function SubscriptionsPage() {
     setCycle(s.billing_cycle)
     setNextDate(s.next_billing_date ?? '')
     setColor(s.color ?? COLORS[0])
+    setGroupName(s.group_name ?? '')
     setError('')
     setDialogOpen(true)
   }
@@ -87,11 +95,12 @@ export default function SubscriptionsPage() {
       billing_cycle: cycle,
       next_billing_date: nextDate || null,
       color,
+      group_name: groupName.trim() || null,
       updated_at: new Date().toISOString(),
     }
     if (editing) {
       const { data } = await supabase.from('subscriptions').update(payload).eq('id', editing.id).select().single()
-      if (data) setSubs(prev => prev.map(s => s.id === editing.id ? data : s))
+      if (data) setSubs(prev => prev.map(s => s.id === editing.id ? data : s).sort((a, b) => a.name.localeCompare(b.name)))
     } else {
       const { data } = await supabase.from('subscriptions').insert({ ...payload, user_id: userId }).select().single()
       if (data) setSubs(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
@@ -114,6 +123,18 @@ export default function SubscriptionsPage() {
   const paused = subs.filter(s => !s.active)
   const totalMonthly = active.reduce((sum, s) => sum + monthlyAmount(s), 0)
   const totalYearly = totalMonthly * 12
+
+  // Group active subs by group_name
+  const groupedActive = active.reduce((acc, s) => {
+    const group = s.group_name ?? ''
+    if (!acc[group]) acc[group] = []
+    acc[group].push(s)
+    return acc
+  }, {} as Record<string, Subscription[]>)
+
+  // Named groups sorted alphabetically, ungrouped at end
+  const namedGroups = Object.keys(groupedActive).filter(g => g !== '').sort((a, b) => a.localeCompare(b))
+  const hasUngrouped = !!groupedActive['']
 
   return (
     <div className="p-6 space-y-5 max-w-2xl mx-auto">
@@ -152,17 +173,42 @@ export default function SubscriptionsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Active */}
-              {active.length > 0 && (
-                <div className="bg-[#111827] border border-white/8 rounded-2xl overflow-hidden">
-                  <div className="px-5 py-3 border-b border-white/6">
-                    <p className="text-sm font-semibold text-white">Active</p>
+              {/* Named groups */}
+              {namedGroups.map(group => {
+                const items = groupedActive[group]
+                const groupTotal = items.reduce((sum, s) => sum + monthlyAmount(s), 0)
+                return (
+                  <div key={group} className="bg-[#111827] border border-white/8 rounded-2xl overflow-hidden">
+                    <div className="px-5 py-3 border-b border-white/6 flex items-center justify-between">
+                      <p className="text-sm font-semibold text-white">{group}</p>
+                      <p className="text-xs text-slate-500">{formatCurrency(groupTotal)}/mo</p>
+                    </div>
+                    {items.map((s, i) => (
+                      <SubRow
+                        key={s.id}
+                        s={s}
+                        last={i === items.length - 1}
+                        onEdit={() => openEdit(s)}
+                        onDelete={() => handleDelete(s.id)}
+                        onToggle={() => toggleActive(s)}
+                      />
+                    ))}
                   </div>
-                  {active.map((s, i) => (
+                )
+              })}
+
+              {/* Ungrouped active */}
+              {hasUngrouped && (
+                <div className="bg-[#111827] border border-white/8 rounded-2xl overflow-hidden">
+                  <div className="px-5 py-3 border-b border-white/6 flex items-center justify-between">
+                    <p className="text-sm font-semibold text-slate-400">Ungrouped</p>
+                    <p className="text-xs text-slate-500">{formatCurrency(groupedActive[''].reduce((sum, s) => sum + monthlyAmount(s), 0))}/mo</p>
+                  </div>
+                  {groupedActive[''].map((s, i) => (
                     <SubRow
                       key={s.id}
                       s={s}
-                      last={i === active.length - 1}
+                      last={i === groupedActive[''].length - 1}
                       onEdit={() => openEdit(s)}
                       onDelete={() => handleDelete(s.id)}
                       onToggle={() => toggleActive(s)}
@@ -203,6 +249,19 @@ export default function SubscriptionsPage() {
             <div className="space-y-2">
               <Label className="text-slate-300">Name</Label>
               <Input autoFocus placeholder="e.g. Netflix" value={name} onChange={e => setName(e.target.value)} className="bg-white/5 border-white/10 text-white" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-300">Group (optional)</Label>
+              <Input
+                list="group-suggestions"
+                placeholder="e.g. Entertainment"
+                value={groupName}
+                onChange={e => setGroupName(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+              />
+              <datalist id="group-suggestions">
+                {SUGGESTED_GROUPS.map(g => <option key={g} value={g} />)}
+              </datalist>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">

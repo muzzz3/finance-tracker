@@ -41,7 +41,9 @@ export function AddTransactionDialog({ open, onOpenChange, categories, onSuccess
     setError('')
 
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     const { error: err } = await supabase.from('transactions').insert({
+      user_id: user?.id,
       amount: parseFloat(amount),
       description: description || null,
       date,
