@@ -11,12 +11,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { AddTransactionDialog } from '@/components/transactions/add-transaction-dialog'
 
+interface Subscription {
+  id: string
+  name: string
+  amount: number
+  billing_cycle: 'monthly' | 'yearly'
+  active: boolean
+}
+
 export default function CategoryPage() {
   const { id } = useParams<{ id: string }>()
   const [category, setCategory] = useState<Category | null>(null)
   const [children, setChildren] = useState<Category[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [subs, setSubs] = useState<Subscription[]>([])
   const [filterMonth, setFilterMonth] = useState<string>('all')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -26,9 +35,10 @@ export default function CategoryPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [{ data: cats }, { data: txs }] = await Promise.all([
+    const [{ data: cats }, { data: txs }, { data: subsData }] = await Promise.all([
       supabase.from('categories').select('*'),
       supabase.from('transactions').select('*').order('date', { ascending: false }),
+      supabase.from('subscriptions').select('id,name,amount,billing_cycle,active').eq('category_id', id),
     ])
 
     const allCats = cats ?? []
@@ -45,6 +55,7 @@ export default function CategoryPage() {
       : [id]
 
     setTransactions((txs ?? []).filter(t => relevantIds.includes(t.category_id ?? '')))
+    setSubs(subsData ?? [])
     setLoading(false)
   }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -93,6 +104,34 @@ export default function CategoryPage() {
               <div key={child.id} className="border rounded-lg p-4">
                 <p className="text-sm text-muted-foreground">{child.name}</p>
                 <p className="text-xl font-bold mt-1">{formatCurrency(childTotal)}</p>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {subs.length > 0 && (
+        <div className="border rounded-lg divide-y">
+          <div className="px-4 py-2.5 flex items-center justify-between">
+            <p className="text-sm font-semibold">Recurring Payments</p>
+            <span className="text-xs text-muted-foreground">
+              {formatCurrency(subs.filter(s => s.active).reduce((sum, s) => sum + (s.billing_cycle === 'yearly' ? s.amount / 12 : s.amount), 0))}/mo
+            </span>
+          </div>
+          {subs.map(s => {
+            const monthly = s.billing_cycle === 'yearly' ? s.amount / 12 : s.amount
+            return (
+              <div key={s.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted/30">
+                <div>
+                  <p className={`text-sm font-medium ${!s.active ? 'text-muted-foreground' : ''}`}>{s.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {s.billing_cycle === 'yearly'
+                      ? `${formatCurrency(s.amount)}/yr · ${formatCurrency(monthly)}/mo`
+                      : `${formatCurrency(s.amount * 12)}/yr · ${formatCurrency(s.amount)}/mo`}
+                    {!s.active && ' · paused'}
+                  </p>
+                </div>
+                <span className="text-sm font-semibold">{formatCurrency(monthly)}<span className="text-xs font-normal text-muted-foreground">/mo</span></span>
               </div>
             )
           })}

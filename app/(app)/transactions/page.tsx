@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { format } from 'date-fns'
-import { Plus, Pencil } from 'lucide-react'
+import { Plus, Pencil, Search } from 'lucide-react'
+import Fuse from 'fuse.js'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/finance'
 import type { Category, Transaction } from '@/lib/types'
@@ -15,6 +16,7 @@ export default function TransactionsPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [filterCategory, setFilterCategory] = useState<string>('all')
+  const [search, setSearch] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -42,9 +44,20 @@ export default function TransactionsPage() {
     setDeleting(null)
   }
 
-  const filtered = filterCategory === 'all'
+  const categoryFiltered = filterCategory === 'all'
     ? transactions
     : transactions.filter(t => t.category_id === filterCategory)
+
+  const filtered = search.trim()
+    ? new Fuse(categoryFiltered, {
+        keys: ['description', 'amount'],
+        threshold: 0.35,
+        getFn: (t, path) => {
+          if (path[0] === 'description') return t.description ?? getCategoryName(t.category_id)
+          return String(t.amount)
+        },
+      }).search(search.trim()).map(r => r.item)
+    : categoryFiltered
 
   function getCategoryName(categoryId: string | null) {
     if (!categoryId) return 'Uncategorized'
@@ -75,8 +88,18 @@ export default function TransactionsPage() {
       </div>
 
       <div className="flex items-center gap-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search transactions..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-9 w-64 rounded-lg border border-white/10 bg-white/5 pl-8 pr-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+          />
+        </div>
         <Select value={filterCategory} onValueChange={v => setFilterCategory(v ?? 'all')}>
-          <SelectTrigger className="w-52 bg-card border-border">
+          <SelectTrigger className="w-48 bg-card border-border">
             <SelectValue placeholder="Filter by category" />
           </SelectTrigger>
           <SelectContent>

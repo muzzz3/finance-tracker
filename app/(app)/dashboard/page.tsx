@@ -99,12 +99,14 @@ export default function DashboardPage() {
 
   const allocationDonutData = [
     ...expenseTopLevel.map(cat => {
+      const subAmount = subsByCategory.get(cat.id) ?? 0
       if (cat.id === foodParent?.id) {
         const total = foodChildren.reduce((s, c) => s + (grouped.get(c.id)?.total ?? 0), 0)
-        return { name: 'Food', value: total, color: cat.color ?? '#f97316' }
+        return { name: 'Food', value: total + subAmount, color: cat.color ?? '#f97316' }
       }
-      return { name: cat.name, value: grouped.get(cat.id)?.total ?? 0, color: cat.color ?? '#888' }
+      return { name: cat.name, value: (grouped.get(cat.id)?.total ?? 0) + subAmount, color: cat.color ?? '#888' }
     }),
+    ...(uncategorizedSubMonthly > 0 ? [{ name: 'Subscriptions', value: uncategorizedSubMonthly, color: '#38bdf8' }] : []),
     ...(k401 > 0 ? [{ name: '401k', value: k401, color: '#a78bfa' }] : []),
     ...(roth > 0 ? [{ name: 'Roth IRA', value: roth, color: '#8b5cf6' }] : []),
     ...(stocks > 0 ? [{ name: 'Stocks', value: stocks, color: '#60a5fa' }] : []),
