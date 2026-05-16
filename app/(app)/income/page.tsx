@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/finance'
+import { CurrencyInput } from '@/components/ui/currency-input'
 
 type FieldKey = 'earnings' | 'k401' | 'roth' | 'stocks'
 
@@ -127,13 +128,11 @@ export default function IncomePage() {
               <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-3">{label}</p>
               <div className="flex items-center gap-1">
                 <span className="text-slate-600 text-xl font-semibold">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <CurrencyInput
+                  raw
                   placeholder="0.00"
                   value={values[key]}
-                  onChange={e => handleChange(key, e.target.value)}
+                  onChange={v => handleChange(key, v)}
                   onBlur={handleBlur}
                   className={`flex-1 bg-transparent text-2xl font-bold focus:outline-none w-full ${color} placeholder-slate-700`}
                 />
@@ -147,13 +146,11 @@ export default function IncomePage() {
               style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
             >
               <span className="text-xs text-slate-600">+$</span>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
+              <CurrencyInput
+                raw
                 placeholder="Add amount"
                 value={addInputs[key]}
-                onChange={e => setAddInputs(prev => ({ ...prev, [key]: e.target.value }))}
+                onChange={v => setAddInputs(prev => ({ ...prev, [key]: v }))}
                 className="flex-1 bg-transparent text-sm text-slate-300 placeholder-slate-700 focus:outline-none"
               />
               <button

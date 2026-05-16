@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/finance'
 import { Plus, X, ShoppingBag, Ban, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Label } from '@/components/ui/label'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -142,7 +143,7 @@ export default function WishlistPage() {
             </div>
             <div className="w-28 space-y-1">
               <Label className="text-xs text-slate-400">Price (optional)</Label>
-              <Input type="number" step="0.01" min="0" placeholder="0.00" value={newPrice} onChange={e => setNewPrice(e.target.value)} className="bg-white/5 border-white/10 text-white h-9" />
+              <CurrencyInput placeholder="0.00" value={newPrice} onChange={setNewPrice} className="bg-white/5 border-white/10 text-white h-9" />
             </div>
             <Button type="submit" size="sm" className="bg-blue-500 hover:bg-blue-600 text-white border-0 h-9">Add</Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setAdding(false)} className="text-slate-400 h-9 px-2">
@@ -224,12 +225,10 @@ export default function WishlistPage() {
               />
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-600">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <CurrencyInput
+                  raw
                   value={detailPrice}
-                  onChange={e => setDetailPrice(e.target.value)}
+                  onChange={setDetailPrice}
                   onBlur={saveDetail}
                   disabled={selectedItem.status !== 'active'}
                   className="w-24 bg-transparent text-sm text-slate-400 placeholder-slate-700 focus:outline-none disabled:opacity-60"

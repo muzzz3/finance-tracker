@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { DatePicker } from '@/components/ui/date-picker'
+import { CurrencyInput } from '@/components/ui/currency-input'
 
 interface Props {
   open: boolean
@@ -119,16 +120,17 @@ export function AddTransactionDialog({ open, onOpenChange, categories, onSuccess
           </div>
 
           <div className="space-y-2">
-            <Label>Amount ($)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              required
-            />
+            <Label>Amount</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+              <CurrencyInput
+                showCents
+                placeholder="0.00"
+                value={amount}
+                onChange={setAmount}
+                className="pl-7"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

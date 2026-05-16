@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DatePicker } from '@/components/ui/date-picker'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { format, parseISO } from 'date-fns'
 
 interface Subscription {
@@ -266,7 +267,7 @@ export default function SubscriptionsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-slate-300">Amount ($)</Label>
-                <Input type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} className="bg-white/5 border-white/10 text-white" />
+                <CurrencyInput placeholder="0.00" value={amount} onChange={setAmount} className="bg-white/5 border-white/10 text-white" />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Billing cycle</Label>

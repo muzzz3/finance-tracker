@@ -6,6 +6,7 @@ import { formatCurrency } from '@/lib/finance'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CurrencyInput } from '@/components/ui/currency-input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -333,7 +334,7 @@ export default function NetWorthPage() {
             </div>
             <div className="space-y-2">
               <Label className="text-slate-300">Current balance ($)</Label>
-              <Input type="number" step="0.01" min="0" placeholder="0.00" value={balance} onChange={e => setBalance(e.target.value)} className="bg-white/5 border-white/10 text-white" />
+              <CurrencyInput placeholder="0.00" value={balance} onChange={setBalance} className="bg-white/5 border-white/10 text-white" />
             </div>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <div className="flex gap-2 justify-end pt-1">
