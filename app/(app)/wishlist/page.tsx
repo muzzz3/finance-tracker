@@ -143,7 +143,10 @@ export default function WishlistPage() {
             </div>
             <div className="w-28 space-y-1">
               <Label className="text-xs text-slate-400">Price (optional)</Label>
-              <CurrencyInput placeholder="0.00" value={newPrice} onChange={setNewPrice} className="bg-white/5 border-white/10 text-white h-9" />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                <CurrencyInput showCents placeholder="0.00" value={newPrice} onChange={setNewPrice} className="bg-white/5 border-white/10 text-white h-9 pl-7" />
+              </div>
             </div>
             <Button type="submit" size="sm" className="bg-blue-500 hover:bg-blue-600 text-white border-0 h-9">Add</Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setAdding(false)} className="text-slate-400 h-9 px-2">
@@ -227,6 +230,7 @@ export default function WishlistPage() {
                 <span className="text-xs text-slate-600">$</span>
                 <CurrencyInput
                   raw
+                  showCents
                   value={detailPrice}
                   onChange={setDetailPrice}
                   onBlur={saveDetail}

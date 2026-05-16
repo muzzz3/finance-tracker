@@ -334,7 +334,10 @@ export default function NetWorthPage() {
             </div>
             <div className="space-y-2">
               <Label className="text-slate-300">Current balance ($)</Label>
-              <CurrencyInput placeholder="0.00" value={balance} onChange={setBalance} className="bg-white/5 border-white/10 text-white" />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                <CurrencyInput showCents placeholder="0.00" value={balance} onChange={setBalance} className="bg-white/5 border-white/10 text-white pl-7" />
+              </div>
             </div>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <div className="flex gap-2 justify-end pt-1">

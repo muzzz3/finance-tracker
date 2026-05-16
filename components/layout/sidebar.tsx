@@ -10,7 +10,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { href: '/income', label: 'Income', icon: Wallet },
-  { href: '/subscriptions', label: 'Subscriptions', icon: Repeat2 },
+  { href: '/subscriptions', label: 'Recurring Payments', icon: Repeat2 },
   { href: '/net-worth', label: 'Net Worth', icon: Landmark },
   { href: '/yearly', label: 'Yearly View', icon: BarChart2 },
   { href: '/wishlist', label: 'Wishlist', icon: ShoppingBag },

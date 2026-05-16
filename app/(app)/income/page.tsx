@@ -130,6 +130,7 @@ export default function IncomePage() {
                 <span className="text-slate-600 text-xl font-semibold">$</span>
                 <CurrencyInput
                   raw
+                  showCents
                   placeholder="0.00"
                   value={values[key]}
                   onChange={v => handleChange(key, v)}
@@ -148,6 +149,7 @@ export default function IncomePage() {
               <span className="text-xs text-slate-600">+$</span>
               <CurrencyInput
                 raw
+                showCents
                 placeholder="Add amount"
                 value={addInputs[key]}
                 onChange={v => setAddInputs(prev => ({ ...prev, [key]: v }))}

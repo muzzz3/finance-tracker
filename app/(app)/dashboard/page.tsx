@@ -25,7 +25,7 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [incomeData, setIncomeData] = useState<MonthlyIncome>({ earnings: 0, k401: 0, roth: 0, stocks: 0 })
-  const [subMonthly, setSubMonthly] = useState(0)
+  const [activeSubs, setActiveSubs] = useState<Array<{ amount: number; billing_cycle: string; category_id: string | null }>>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -42,7 +42,7 @@ export default function DashboardPage() {
       supabase.from('categories').select('*').order('name'),
       supabase.from('transactions').select('*').gte('date', startDate).lte('date', endDate).order('date', { ascending: false }),
       supabase.from('monthly_income').select('*').eq('month', monthStr).maybeSingle(),
-      supabase.from('subscriptions').select('amount,billing_cycle').eq('active', true),
+      supabase.from('subscriptions').select('amount,billing_cycle,category_id').eq('active', true),
     ])
 
     setCategories(cats ?? [])
@@ -53,8 +53,7 @@ export default function DashboardPage() {
       roth: income?.roth ?? 0,
       stocks: income?.stocks ?? 0,
     })
-    setSubMonthly((subs ?? []).reduce((sum, s) =>
-      sum + (s.billing_cycle === 'yearly' ? s.amount / 12 : s.amount), 0))
+    setActiveSubs(subs ?? [])
     setLoading(false)
   }, [year, month]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -65,6 +64,16 @@ export default function DashboardPage() {
   const foodParent = categories.find(c => c.name === 'Food' && c.type === 'expense')
   const foodChildren = categories.filter(c => c.parent_id === foodParent?.id)
   const expenseTopLevel = categories.filter(c => c.type === 'expense' && !c.parent_id)
+
+  const subMonthlyOf = (s: { amount: number; billing_cycle: string }) =>
+    s.billing_cycle === 'yearly' ? s.amount / 12 : s.amount
+  const subMonthly = activeSubs.reduce((sum, s) => sum + subMonthlyOf(s), 0)
+  const subsByCategory = activeSubs.reduce((acc, s) => {
+    if (s.category_id) acc.set(s.category_id, (acc.get(s.category_id) ?? 0) + subMonthlyOf(s))
+    return acc
+  }, new Map<string, number>())
+  const uncategorizedSubMonthly = activeSubs.filter(s => !s.category_id).reduce((sum, s) => sum + subMonthlyOf(s), 0)
+
   const txExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const totalExpenses = txExpenses + subMonthly
   const paycheckSavings = earnings - totalExpenses - k401 - roth - stocks
@@ -78,13 +87,14 @@ export default function DashboardPage() {
 
   const expenseDonutData = [
     ...expenseTopLevel.map(cat => {
+      const subAmount = subsByCategory.get(cat.id) ?? 0
       if (cat.id === foodParent?.id) {
         const total = foodChildren.reduce((s, c) => s + (grouped.get(c.id)?.total ?? 0), 0)
-        return { name: 'Food', value: total, color: cat.color ?? '#f97316' }
+        return { name: 'Food', value: total + subAmount, color: cat.color ?? '#f97316' }
       }
-      return { name: cat.name, value: grouped.get(cat.id)?.total ?? 0, color: cat.color ?? '#888' }
+      return { name: cat.name, value: (grouped.get(cat.id)?.total ?? 0) + subAmount, color: cat.color ?? '#888' }
     }),
-    ...(subMonthly > 0 ? [{ name: 'Subscriptions', value: subMonthly, color: '#38bdf8' }] : []),
+    ...(uncategorizedSubMonthly > 0 ? [{ name: 'Subscriptions', value: uncategorizedSubMonthly, color: '#38bdf8' }] : []),
   ]
 
   const allocationDonutData = [
@@ -220,7 +230,7 @@ export default function DashboardPage() {
                   </div>
                 )}
                 {expenseTopLevel.filter(c => c.id !== foodParent?.id).map(cat => {
-                  const total = grouped.get(cat.id)?.total ?? 0
+                  const total = (grouped.get(cat.id)?.total ?? 0) + (subsByCategory.get(cat.id) ?? 0)
                   const pct = totalExpenses > 0 ? (total / totalExpenses) * 100 : 0
                   return (
                     <div key={cat.id} className="px-5 py-2.5 border-b border-white/6 last:border-0">

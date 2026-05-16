@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { DatePicker } from '@/components/ui/date-picker'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import { format, parseISO } from 'date-fns'
+import type { Category } from '@/lib/types'
 
 interface Subscription {
   id: string
@@ -21,6 +22,7 @@ interface Subscription {
   color: string | null
   active: boolean
   group_name: string | null
+  category_id: string | null
 }
 
 const COLORS = [
@@ -38,6 +40,7 @@ const monthlyAmount = (s: Subscription) =>
 
 export default function SubscriptionsPage() {
   const [subs, setSubs] = useState<Subscription[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -49,6 +52,7 @@ export default function SubscriptionsPage() {
   const [nextDate, setNextDate] = useState('')
   const [color, setColor] = useState(COLORS[0])
   const [groupName, setGroupName] = useState('')
+  const [categoryId, setCategoryId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -56,12 +60,14 @@ export default function SubscriptionsPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [{ data: userData }, { data }] = await Promise.all([
+    const [{ data: userData }, { data }, { data: cats }] = await Promise.all([
       supabase.auth.getUser(),
       supabase.from('subscriptions').select('*').order('name'),
+      supabase.from('categories').select('*').eq('type', 'expense').is('parent_id', null).order('name'),
     ])
     setUserId(userData.user?.id ?? null)
     setSubs(data ?? [])
+    setCategories(cats ?? [])
     setLoading(false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -69,7 +75,7 @@ export default function SubscriptionsPage() {
 
   function openAdd() {
     setEditing(null)
-    setName(''); setAmount(''); setCycle('monthly'); setNextDate(''); setColor(COLORS[0]); setGroupName(''); setError('')
+    setName(''); setAmount(''); setCycle('monthly'); setNextDate(''); setColor(COLORS[0]); setGroupName(''); setCategoryId(''); setError('')
     setDialogOpen(true)
   }
 
@@ -81,6 +87,7 @@ export default function SubscriptionsPage() {
     setNextDate(s.next_billing_date ?? '')
     setColor(s.color ?? COLORS[0])
     setGroupName(s.group_name ?? '')
+    setCategoryId(s.category_id ?? '')
     setError('')
     setDialogOpen(true)
   }
@@ -97,6 +104,7 @@ export default function SubscriptionsPage() {
       next_billing_date: nextDate || null,
       color,
       group_name: groupName.trim() || null,
+      category_id: categoryId || null,
       updated_at: new Date().toISOString(),
     }
     if (editing) {
@@ -140,7 +148,7 @@ export default function SubscriptionsPage() {
   return (
     <div className="p-6 space-y-5 max-w-2xl mx-auto">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-white">Subscriptions</h1>
+        <h1 className="text-xl font-bold text-white">Recurring Payments</h1>
         <Button onClick={openAdd} size="sm" className="gap-1.5 bg-blue-500 hover:bg-blue-600 text-white border-0">
           <Plus className="w-3.5 h-3.5" /> Add
         </Button>
@@ -166,7 +174,7 @@ export default function SubscriptionsPage() {
 
           {subs.length === 0 ? (
             <div className="bg-[#111827] border border-white/8 rounded-2xl p-12 text-center">
-              <p className="text-white font-semibold mb-1">No subscriptions yet</p>
+              <p className="text-white font-semibold mb-1">No recurring payments yet</p>
               <p className="text-sm text-slate-500 mb-4">Track your recurring payments in one place.</p>
               <Button onClick={openAdd} size="sm" className="gap-1.5 bg-blue-500 hover:bg-blue-600 text-white border-0">
                 <Plus className="w-3.5 h-3.5" /> Add subscription
@@ -252,6 +260,19 @@ export default function SubscriptionsPage() {
               <Input autoFocus placeholder="e.g. Netflix" value={name} onChange={e => setName(e.target.value)} className="bg-white/5 border-white/10 text-white" />
             </div>
             <div className="space-y-2">
+              <Label className="text-slate-300">Expense category (optional)</Label>
+              <select
+                value={categoryId}
+                onChange={e => setCategoryId(e.target.value)}
+                className="w-full h-9 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+              >
+                <option value="" className="bg-[#1e293b]">None — show as Subscriptions</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.id} className="bg-[#1e293b]">{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
               <Label className="text-slate-300">Group (optional)</Label>
               <Input
                 list="group-suggestions"
@@ -267,7 +288,10 @@ export default function SubscriptionsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-slate-300">Amount ($)</Label>
-                <CurrencyInput placeholder="0.00" value={amount} onChange={setAmount} className="bg-white/5 border-white/10 text-white" />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                  <CurrencyInput showCents placeholder="0.00" value={amount} onChange={setAmount} className="bg-white/5 border-white/10 text-white pl-7" />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-300">Billing cycle</Label>
@@ -336,7 +360,7 @@ function SubRow({ s, last, onEdit, onDelete, onToggle }: {
           <p className="text-xs text-slate-600">
             {isYearly
               ? `${formatCurrency(s.amount)}/yr · ${formatCurrency(monthly)}/mo`
-              : `${formatCurrency(s.amount)}/mo`}
+              : `${formatCurrency(s.amount * 12)}/yr · ${formatCurrency(s.amount)}/mo`}
             {s.next_billing_date && ` · renews ${format(parseISO(s.next_billing_date), 'MMM d')}`}
           </p>
         </div>

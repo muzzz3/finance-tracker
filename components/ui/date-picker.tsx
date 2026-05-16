@@ -13,8 +13,11 @@ const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
 export function DatePicker({ value, onChange }: DatePickerProps) {
   const [open, setOpen] = useState(false)
+  const [dropUp, setDropUp] = useState(false)
+  const [alignRight, setAlignRight] = useState(false)
   const [viewDate, setViewDate] = useState(() => value ? parseISO(value) : new Date())
   const ref = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
 
   const selected = value ? parseISO(value) : null
   const today = new Date()
@@ -26,6 +29,15 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  function handleToggle() {
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      setDropUp(window.innerHeight - rect.bottom < 320)
+      setAlignRight(window.innerWidth - rect.left < 280)
+    }
+    setOpen(o => !o)
+  }
 
   // Sync view month when value changes externally
   useEffect(() => {
@@ -45,8 +57,9 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
   return (
     <div ref={ref} className="relative">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={handleToggle}
         className="w-full h-9 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-left flex items-center justify-between focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-colors hover:bg-white/8"
       >
         <span className={selected ? 'text-white' : 'text-slate-600'}>
@@ -57,7 +70,7 @@ export function DatePicker({ value, onChange }: DatePickerProps) {
 
       {open && (
         <div
-          className="absolute left-0 mt-1.5 w-64 rounded-xl border border-white/10 shadow-2xl p-3"
+          className={`absolute w-64 rounded-xl border border-white/10 shadow-2xl p-3 ${dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} ${alignRight ? 'right-0' : 'left-0'}`}
           style={{ backgroundColor: '#1a2235', zIndex: 9999 }}
         >
           {/* Month navigation */}
