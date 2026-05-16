@@ -18,6 +18,30 @@ interface MonthlyIncome {
   stocks: number
 }
 
+type SortOrder = 'name' | 'asc' | 'desc'
+
+function SortButtons({ value, onChange }: { value: SortOrder; onChange: (v: SortOrder) => void }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {(['name', 'asc', 'desc'] as SortOrder[]).map(o => (
+        <button
+          key={o}
+          onClick={() => onChange(o)}
+          className={`px-1.5 py-0.5 rounded text-xs transition-colors ${value === o ? 'bg-white/10 text-white' : 'text-slate-600 hover:text-slate-400'}`}
+        >
+          {o === 'name' ? 'A–Z' : o === 'asc' ? '↑' : '↓'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function sortItems<T extends { name: string; value: number }>(items: T[], order: SortOrder): T[] {
+  if (order === 'name') return [...items].sort((a, b) => a.name.localeCompare(b.name))
+  if (order === 'asc') return [...items].sort((a, b) => a.value - b.value)
+  return [...items].sort((a, b) => b.value - a.value)
+}
+
 export default function DashboardPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
@@ -28,6 +52,9 @@ export default function DashboardPage() {
   const [activeSubs, setActiveSubs] = useState<Array<{ amount: number; billing_cycle: string; category_id: string | null }>>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [expenseSort, setExpenseSort] = useState<SortOrder>('desc')
+  const [allocationSort, setAllocationSort] = useState<SortOrder>('desc')
+  const [expenseListSort, setExpenseListSort] = useState<SortOrder>('desc')
 
   const supabase = createClient()
 
@@ -115,6 +142,16 @@ export default function DashboardPage() {
 
   const recentTxs = transactions.slice(0, 6)
 
+  const sortedExpenseList = (() => {
+    const items = expenseTopLevel.filter(c => c.id !== foodParent?.id).map(cat => ({
+      cat,
+      total: (grouped.get(cat.id)?.total ?? 0) + (subsByCategory.get(cat.id) ?? 0),
+    }))
+    if (expenseListSort === 'name') return [...items].sort((a, b) => a.cat.name.localeCompare(b.cat.name))
+    if (expenseListSort === 'asc') return [...items].sort((a, b) => a.total - b.total)
+    return [...items].sort((a, b) => b.total - a.total)
+  })()
+
   return (
     <div className="p-6 space-y-5 max-w-7xl mx-auto">
       {/* Header */}
@@ -162,11 +199,14 @@ export default function DashboardPage() {
           <div className="grid grid-cols-3 gap-5">
             {/* Expense breakdown donut */}
             <div className="bg-[#111827] border border-white/8 rounded-2xl p-5">
-              <p className="text-sm font-semibold text-white mb-1">Expense Breakdown</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-white">Expense Breakdown</p>
+                <SortButtons value={expenseSort} onChange={setExpenseSort} />
+              </div>
               <p className="text-xs text-slate-500 mb-3">Where your spending goes</p>
               <DonutChart data={expenseDonutData} centerLabel="Total" centerValue={formatCurrency(totalExpenses)} />
               <div className="mt-3 space-y-2">
-                {expenseDonutData.filter(d => d.value > 0).map(d => (
+                {sortItems(expenseDonutData.filter(d => d.value > 0), expenseSort).map(d => (
                   <div key={d.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
@@ -185,11 +225,14 @@ export default function DashboardPage() {
 
             {/* Income allocation donut */}
             <div className="bg-[#111827] border border-white/8 rounded-2xl p-5">
-              <p className="text-sm font-semibold text-white mb-1">Income Allocation</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-white">Income Allocation</p>
+                <SortButtons value={allocationSort} onChange={setAllocationSort} />
+              </div>
               <p className="text-xs text-slate-500 mb-3">Where your paycheck goes</p>
               <DonutChart data={allocationDonutData} centerLabel="Income" centerValue={formatCurrency(earnings)} />
               <div className="mt-3 space-y-2">
-                {allocationDonutData.filter(d => d.value > 0).map(d => (
+                {sortItems(allocationDonutData.filter(d => d.value > 0), allocationSort).map(d => (
                   <div key={d.name} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
@@ -210,8 +253,9 @@ export default function DashboardPage() {
             <div className="space-y-4">
               {/* Expense category list */}
               <div className="bg-[#111827] border border-white/8 rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-white/6">
+                <div className="px-5 py-4 border-b border-white/6 flex items-center justify-between">
                   <p className="text-sm font-semibold text-white">Expenses</p>
+                  <SortButtons value={expenseListSort} onChange={setExpenseListSort} />
                 </div>
                 {foodParent && (
                   <div className="px-5 py-3 border-b border-white/6">
@@ -231,8 +275,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 )}
-                {expenseTopLevel.filter(c => c.id !== foodParent?.id).map(cat => {
-                  const total = (grouped.get(cat.id)?.total ?? 0) + (subsByCategory.get(cat.id) ?? 0)
+                {sortedExpenseList.map(({ cat, total }) => {
                   const pct = totalExpenses > 0 ? (total / totalExpenses) * 100 : 0
                   return (
                     <div key={cat.id} className="px-5 py-2.5 border-b border-white/6 last:border-0">
