@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { format } from 'date-fns'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/finance'
 import type { Category, Transaction } from '@/lib/types'
@@ -16,6 +16,7 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -68,7 +69,7 @@ export default function TransactionsPage() {
           <h1 className="text-2xl font-bold">Transactions</h1>
           <p className="text-sm text-muted-foreground mt-0.5">All your recorded entries</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} className="gap-2">
+        <Button onClick={() => { setEditingTx(null); setDialogOpen(true) }} className="gap-2">
           <Plus className="w-4 h-4" /> Add Transaction
         </Button>
       </div>
@@ -108,10 +109,16 @@ export default function TransactionsPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <span className={`font-semibold text-sm ${tx.type === 'saving' ? 'text-blue-400' : 'text-foreground'}`}>
                   {formatCurrency(tx.amount)}
                 </span>
+                <button
+                  onClick={() => { setEditingTx(tx); setDialogOpen(true) }}
+                  className="text-muted-foreground hover:text-blue-400 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => handleDelete(tx.id)}
                   disabled={deleting === tx.id}
@@ -130,6 +137,7 @@ export default function TransactionsPage() {
         onOpenChange={setDialogOpen}
         categories={categories}
         onSuccess={fetchData}
+        editing={editingTx}
       />
     </div>
   )
