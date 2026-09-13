@@ -35,10 +35,9 @@ export default function CategoryPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [{ data: cats }, { data: txs }, { data: subsData }] = await Promise.all([
+    const [{ data: cats }, { data: txs }] = await Promise.all([
       supabase.from('categories').select('*'),
       supabase.from('transactions').select('*').order('date', { ascending: false }),
-      supabase.from('subscriptions').select('id,name,amount,billing_cycle,active').eq('category_id', id),
     ])
 
     const allCats = cats ?? []
@@ -55,6 +54,12 @@ export default function CategoryPage() {
       : [id]
 
     setTransactions((txs ?? []).filter(t => relevantIds.includes(t.category_id ?? '')))
+
+    // Subscriptions tagged to this category OR (when viewing a parent) any of its children
+    const { data: subsData } = await supabase
+      .from('subscriptions')
+      .select('id,name,amount,billing_cycle,active,category_id')
+      .in('category_id', relevantIds)
     setSubs(subsData ?? [])
     setLoading(false)
   }, [id]) // eslint-disable-line react-hooks/exhaustive-deps

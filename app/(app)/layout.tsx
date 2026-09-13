@@ -3,6 +3,8 @@ import { ChatTray } from '@/components/ai/chat-tray'
 import { PrivacyModeProvider } from '@/lib/privacy-mode'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const chatEnabled = process.env.NEXT_PUBLIC_ENABLE_CHAT === 'true'
+
   return (
     <PrivacyModeProvider>
       <div className="flex h-screen overflow-hidden">
@@ -10,7 +12,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 overflow-y-auto" style={{ backgroundColor: '#0d1424' }}>
           {children}
         </main>
-        <ChatTray />
+        {chatEnabled && <ChatTray />}
       </div>
     </PrivacyModeProvider>
   )

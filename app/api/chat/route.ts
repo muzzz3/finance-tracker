@@ -48,7 +48,8 @@ function buildContext(txs: any[], income: any[], subs: any[], accounts: any[], c
   ctx += `\n### Active Recurring Payments (${usd(subMonthly)}/mo total)\n`
   for (const sub of subs) {
     const monthly = sub.billing_cycle === 'yearly' ? sub.amount / 12 : sub.amount
-    ctx += `  - ${sub.name}: ${usd(monthly)}/mo${sub.group_name ? ` (${sub.group_name})` : ''}\n`
+    const catName = sub.category_id ? catMap.get(sub.category_id) : null
+    ctx += `  - ${sub.name}: ${usd(monthly)}/mo${catName ? ` (${catName})` : ''}\n`
   }
 
   // Net worth

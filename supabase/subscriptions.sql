@@ -7,6 +7,9 @@ CREATE TABLE subscriptions (
   next_billing_date DATE,
   color TEXT,
   active BOOLEAN NOT NULL DEFAULT true,
+  -- Same categories transactions use (see schema.sql), restricted to
+  -- 'expense' type in the app since recurring payments are always expenses.
+  category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -14,3 +17,4 @@ CREATE TABLE subscriptions (
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "users_own_subscriptions" ON subscriptions FOR ALL USING (auth.uid() = user_id);
 CREATE INDEX idx_subscriptions_user ON subscriptions(user_id);
+CREATE INDEX idx_subscriptions_category ON subscriptions(category_id);

@@ -21,18 +21,12 @@ interface Subscription {
   next_billing_date: string | null
   color: string | null
   active: boolean
-  group_name: string | null
   category_id: string | null
 }
 
 const COLORS = [
   '#60a5fa', '#34d399', '#f59e0b', '#f87171', '#a78bfa',
   '#fb923c', '#e879f9', '#94a3b8', '#38bdf8', '#4ade80',
-]
-
-const SUGGESTED_GROUPS = [
-  'Credit Cards', 'Entertainment', 'Food', 'Gaming',
-  'Health & Fitness', 'Home', 'Shopping', 'Software & Tools',
 ]
 
 const monthlyAmount = (s: Subscription) =>
@@ -51,7 +45,6 @@ export default function SubscriptionsPage() {
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [nextDate, setNextDate] = useState('')
   const [color, setColor] = useState(COLORS[0])
-  const [groupName, setGroupName] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -63,7 +56,10 @@ export default function SubscriptionsPage() {
     const [{ data: userData }, { data }, { data: cats }] = await Promise.all([
       supabase.auth.getUser(),
       supabase.from('subscriptions').select('*').order('name'),
-      supabase.from('categories').select('*').eq('type', 'expense').is('parent_id', null).order('name'),
+      // Same expense-category universe transactions use (full hierarchy) —
+      // savings categories are intentionally excluded since recurring
+      // payments are always expenses (see dashboard expense breakdown).
+      supabase.from('categories').select('*').eq('type', 'expense').order('name'),
     ])
     setUserId(userData.user?.id ?? null)
     setSubs(data ?? [])
@@ -75,7 +71,7 @@ export default function SubscriptionsPage() {
 
   function openAdd() {
     setEditing(null)
-    setName(''); setAmount(''); setCycle('monthly'); setNextDate(''); setColor(COLORS[0]); setGroupName(''); setCategoryId(''); setError('')
+    setName(''); setAmount(''); setCycle('monthly'); setNextDate(''); setColor(COLORS[0]); setCategoryId(''); setError('')
     setDialogOpen(true)
   }
 
@@ -86,7 +82,6 @@ export default function SubscriptionsPage() {
     setCycle(s.billing_cycle)
     setNextDate(s.next_billing_date ?? '')
     setColor(s.color ?? COLORS[0])
-    setGroupName(s.group_name ?? '')
     setCategoryId(s.category_id ?? '')
     setError('')
     setDialogOpen(true)
@@ -103,7 +98,6 @@ export default function SubscriptionsPage() {
       billing_cycle: cycle,
       next_billing_date: nextDate || null,
       color,
-      group_name: groupName.trim() || null,
       category_id: categoryId || null,
       updated_at: new Date().toISOString(),
     }
@@ -133,17 +127,47 @@ export default function SubscriptionsPage() {
   const totalMonthly = active.reduce((sum, s) => sum + monthlyAmount(s), 0)
   const totalYearly = totalMonthly * 12
 
-  // Group active subs by group_name
+  const categoryById = new Map(categories.map(c => [c.id, c]))
+
+  // Same "Parent → Child" label transactions use.
+  function categoryLabel(catId: string | null): string | null {
+    if (!catId) return null
+    const cat = categoryById.get(catId)
+    if (!cat) return null
+    if (cat.parent_id) {
+      const parent = categoryById.get(cat.parent_id)
+      return parent ? `${parent.name} → ${cat.name}` : cat.name
+    }
+    return cat.name
+  }
+
+  // Child categories roll up into their parent's group, same as the
+  // dashboard rolls Food's children into "Food".
+  function topCategoryId(catId: string | null): string {
+    if (!catId) return ''
+    const cat = categoryById.get(catId)
+    if (!cat) return ''
+    return cat.parent_id ?? cat.id
+  }
+
+  // Group active subs by top-level category
   const groupedActive = active.reduce((acc, s) => {
-    const group = s.group_name ?? ''
-    if (!acc[group]) acc[group] = []
-    acc[group].push(s)
+    const key = topCategoryId(s.category_id)
+    if (!acc[key]) acc[key] = []
+    acc[key].push(s)
     return acc
   }, {} as Record<string, Subscription[]>)
 
-  // Named groups sorted alphabetically, ungrouped at end
-  const namedGroups = Object.keys(groupedActive).filter(g => g !== '').sort((a, b) => a.localeCompare(b))
-  const hasUngrouped = !!groupedActive['']
+  // Named category groups sorted alphabetically, uncategorized at end
+  const namedGroupIds = Object.keys(groupedActive)
+    .filter(id => id !== '')
+    .sort((a, b) => (categoryById.get(a)?.name ?? '').localeCompare(categoryById.get(b)?.name ?? ''))
+  const hasUncategorized = !!groupedActive['']
+
+  // Grouped category select — parents without children as themselves,
+  // parents with children expanded to their children (matches AddTransactionDialog).
+  const parentCategories = categories.filter(c => !c.parent_id)
+  const childCategories = categories.filter(c => c.parent_id)
 
   return (
     <div className="p-6 space-y-5 max-w-2xl mx-auto">
@@ -182,20 +206,21 @@ export default function SubscriptionsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Named groups */}
-              {namedGroups.map(group => {
-                const items = groupedActive[group]
+              {/* Named category groups */}
+              {namedGroupIds.map(catId => {
+                const items = groupedActive[catId]
                 const groupTotal = items.reduce((sum, s) => sum + monthlyAmount(s), 0)
                 return (
-                  <div key={group} className="bg-[#111827] border border-white/8 rounded-2xl overflow-hidden">
+                  <div key={catId} className="bg-[#111827] border border-white/8 rounded-2xl overflow-hidden">
                     <div className="px-5 py-3 border-b border-white/6 flex items-center justify-between">
-                      <p className="text-sm font-semibold text-white">{group}</p>
+                      <p className="text-sm font-semibold text-white">{categoryById.get(catId)?.name ?? 'Unknown'}</p>
                       <p className="text-xs text-slate-500">{formatCurrency(groupTotal)}/mo</p>
                     </div>
                     {items.map((s, i) => (
                       <SubRow
                         key={s.id}
                         s={s}
+                        subLabel={categoryLabel(s.category_id) !== categoryById.get(catId)?.name ? categoryLabel(s.category_id) : null}
                         last={i === items.length - 1}
                         onEdit={() => openEdit(s)}
                         onDelete={() => handleDelete(s.id)}
@@ -206,17 +231,18 @@ export default function SubscriptionsPage() {
                 )
               })}
 
-              {/* Ungrouped active */}
-              {hasUngrouped && (
+              {/* Uncategorized active */}
+              {hasUncategorized && (
                 <div className="bg-[#111827] border border-white/8 rounded-2xl overflow-hidden">
                   <div className="px-5 py-3 border-b border-white/6 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-400">Ungrouped</p>
+                    <p className="text-sm font-semibold text-slate-400">Uncategorized</p>
                     <p className="text-xs text-slate-500">{formatCurrency(groupedActive[''].reduce((sum, s) => sum + monthlyAmount(s), 0))}/mo</p>
                   </div>
                   {groupedActive[''].map((s, i) => (
                     <SubRow
                       key={s.id}
                       s={s}
+                      subLabel={null}
                       last={i === groupedActive[''].length - 1}
                       onEdit={() => openEdit(s)}
                       onDelete={() => handleDelete(s.id)}
@@ -236,6 +262,7 @@ export default function SubscriptionsPage() {
                     <SubRow
                       key={s.id}
                       s={s}
+                      subLabel={categoryLabel(s.category_id)}
                       last={i === paused.length - 1}
                       onEdit={() => openEdit(s)}
                       onDelete={() => handleDelete(s.id)}
@@ -260,30 +287,29 @@ export default function SubscriptionsPage() {
               <Input autoFocus placeholder="e.g. Netflix" value={name} onChange={e => setName(e.target.value)} className="bg-white/5 border-white/10 text-white" />
             </div>
             <div className="space-y-2">
-              <Label className="text-slate-300">Expense category (optional)</Label>
+              <Label className="text-slate-300">Category (optional)</Label>
               <select
                 value={categoryId}
                 onChange={e => setCategoryId(e.target.value)}
                 className="w-full h-9 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500/50"
               >
-                <option value="" className="bg-[#1e293b]">None — show as Subscriptions</option>
-                {categories.map(c => (
-                  <option key={c.id} value={c.id} className="bg-[#1e293b]">{c.name}</option>
-                ))}
+                <option value="" className="bg-[#1e293b]">None — show as Uncategorized</option>
+                {parentCategories.map(parent => {
+                  const children = childCategories.filter(c => c.parent_id === parent.id)
+                  if (children.length > 0) {
+                    return children.map(child => (
+                      <option key={child.id} value={child.id} className="bg-[#1e293b]">
+                        {parent.name} → {child.name}
+                      </option>
+                    ))
+                  }
+                  return (
+                    <option key={parent.id} value={parent.id} className="bg-[#1e293b]">
+                      {parent.name}
+                    </option>
+                  )
+                })}
               </select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-slate-300">Group (optional)</Label>
-              <Input
-                list="group-suggestions"
-                placeholder="e.g. Entertainment"
-                value={groupName}
-                onChange={e => setGroupName(e.target.value)}
-                className="bg-white/5 border-white/10 text-white"
-              />
-              <datalist id="group-suggestions">
-                {SUGGESTED_GROUPS.map(g => <option key={g} value={g} />)}
-              </datalist>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -341,8 +367,9 @@ export default function SubscriptionsPage() {
   )
 }
 
-function SubRow({ s, last, onEdit, onDelete, onToggle }: {
+function SubRow({ s, subLabel, last, onEdit, onDelete, onToggle }: {
   s: Subscription
+  subLabel: string | null
   last: boolean
   onEdit: () => void
   onDelete: () => void
@@ -362,6 +389,7 @@ function SubRow({ s, last, onEdit, onDelete, onToggle }: {
               ? `${formatCurrency(s.amount)}/yr · ${formatCurrency(monthly)}/mo`
               : `${formatCurrency(s.amount * 12)}/yr · ${formatCurrency(s.amount)}/mo`}
             {s.next_billing_date && ` · renews ${format(parseISO(s.next_billing_date), 'MMM d')}`}
+            {subLabel && ` · ${subLabel}`}
           </p>
         </div>
       </div>
