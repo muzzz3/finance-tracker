@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "PowerShell(wsl -e bash -c \"free -h\")",
-      "PowerShell(wsl -e bash -c \"ps aux --sort=-%mem | grep -E 'node|next' | grep -v grep\")"
-    ]
-  }
-}
