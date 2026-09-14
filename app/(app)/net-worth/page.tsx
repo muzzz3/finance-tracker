@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DonutChart } from '@/components/charts/donut-chart'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { format } from 'date-fns'
 
 interface Account {
   id: string
@@ -51,8 +53,16 @@ const DEFAULT_ASSET_CLASS: Record<string, string> = {
 
 const isLiability = (type: string) => ACCOUNT_TYPES.find(t => t.value === type)?.liability ?? false
 
+interface Snapshot {
+  month: string
+  total_assets: number
+  total_liabilities: number
+  net_worth: number
+}
+
 export default function NetWorthPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingAccount, setEditingAccount] = useState<Account | null>(null)
@@ -71,16 +81,46 @@ export default function NetWorthPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const [{ data: userData }, { data }] = await Promise.all([
+    const [{ data: userData }, { data }, { data: snaps }] = await Promise.all([
       supabase.auth.getUser(),
       supabase.from('accounts').select('*').order('created_at'),
+      supabase.from('net_worth_snapshots').select('month,total_assets,total_liabilities,net_worth').order('month'),
     ])
     setUserId(userData.user?.id ?? null)
     setAccounts(data ?? [])
+    setSnapshots(snaps ?? [])
     setLoading(false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Auto-capture this month's net worth snapshot whenever balances change.
+  // Upsert keeps a single row per month fresh with the latest totals rather
+  // than accumulating multiple points within the same month.
+  useEffect(() => {
+    if (!userId || loading || accounts.length === 0) return
+    const totalAssets = accounts.filter(a => !isLiability(a.type)).reduce((s, a) => s + a.balance, 0)
+    const totalLiabilities = accounts.filter(a => isLiability(a.type)).reduce((s, a) => s + a.balance, 0)
+    const now = new Date()
+    const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    const netWorth = totalAssets - totalLiabilities
+
+    supabase.from('net_worth_snapshots').upsert({
+      user_id: userId,
+      month,
+      total_assets: totalAssets,
+      total_liabilities: totalLiabilities,
+      net_worth: netWorth,
+      updated_at: now.toISOString(),
+    }, { onConflict: 'user_id,month' }).then(({ error }) => {
+      if (error) return
+      setSnapshots(prev => {
+        const withoutCurrent = prev.filter(s => s.month !== month)
+        return [...withoutCurrent, { month, total_assets: totalAssets, total_liabilities: totalLiabilities, net_worth: netWorth }]
+          .sort((a, b) => a.month.localeCompare(b.month))
+      })
+    })
+  }, [accounts, userId, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function openAdd() {
     setEditingAccount(null)
@@ -187,6 +227,41 @@ export default function NetWorthPage() {
               <p className="text-3xl font-bold text-red-400">{formatCurrency(totalLiabilities)}</p>
             </div>
           </div>
+
+          {/* Net worth over time */}
+          {snapshots.length >= 2 && (
+            <div className="bg-[#111827] border border-white/8 rounded-2xl p-5">
+              <p className="text-sm font-semibold text-white mb-1">Net Worth Over Time</p>
+              <p className="text-xs text-slate-500 mb-3">One snapshot per month, from your account balances</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={snapshots.map(s => ({
+                  month: format(new Date(s.month + 'T00:00:00'), 'MMM yyyy'),
+                  'Net Worth': s.net_worth,
+                }))} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="netWorthGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    formatter={(value) => formatCurrency(Number(value))}
+                    contentStyle={{ backgroundColor: '#1a2235', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}
+                    labelStyle={{ color: '#fff' }}
+                  />
+                  <Area type="monotone" dataKey="Net Worth" stroke="#34d399" strokeWidth={2} fill="url(#netWorthGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          {snapshots.length === 1 && (
+            <div className="bg-[#111827] border border-white/8 rounded-2xl p-5 text-center">
+              <p className="text-sm text-slate-400">This month&apos;s net worth is being tracked — check back next month to see a trend line.</p>
+            </div>
+          )}
 
           {accounts.length === 0 ? (
             <div className="bg-[#111827] border border-white/8 rounded-2xl p-12 text-center">

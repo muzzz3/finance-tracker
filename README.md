@@ -62,6 +62,7 @@ proxy.ts              # Auth middleware (Next.js 16 convention)
 | `monthly_income` | Per-month earnings, 401k, Roth, stocks |
 | `subscriptions` | Recurring payments with billing cycle |
 | `accounts` | Net worth accounts with asset class |
+| `net_worth_snapshots` | Monthly net worth history, auto-captured from accounts |
 | `wishlist_items` | Impulse buy tracking list |
 
 All tables use Supabase Row Level Security — users can only access their own data.
@@ -71,7 +72,7 @@ All tables use Supabase Row Level Security — users can only access their own d
 1. Clone the repo
 2. Create a Supabase project at [supabase.com](https://supabase.com)
 3. Copy `.env.local.example` to `.env.local` and fill in your Supabase URL and anon key
-4. Run the SQL files in `supabase/` in the Supabase SQL editor (in order: `schema.sql`, `accounts.sql`, `monthly_income.sql`, `subscriptions.sql`, `wishlist.sql`)
+4. Run the SQL files in `supabase/` in the Supabase SQL editor (in order: `schema.sql`, `accounts.sql`, `monthly_income.sql`, `subscriptions.sql`, `net_worth_snapshots.sql`, `wishlist.sql`)
 5. Install dependencies and start the dev server:
 
 ```bash
