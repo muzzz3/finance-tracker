@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { format } from 'date-fns'
-import { Plus, Pencil, Search } from 'lucide-react'
+import { Plus, Pencil, Search, ChevronDown, ChevronRight } from 'lucide-react'
 import Fuse from 'fuse.js'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency } from '@/lib/finance'
@@ -21,6 +21,8 @@ export default function TransactionsPage() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // Manual expand/collapse per month ('YYYY-MM'); unset months use the default in isMonthOpen
+  const [monthOverrides, setMonthOverrides] = useState<Record<string, boolean>>({})
 
   const supabase = createClient()
 
@@ -58,6 +60,27 @@ export default function TransactionsPage() {
         },
       }).search(search.trim()).map(r => r.item)
     : categoryFiltered
+
+  // Group by month. Uses a Map (not consecutive runs) because fuzzy search
+  // orders results by relevance rather than date.
+  const currentMonth = format(new Date(), 'yyyy-MM')
+  const isFiltering = search.trim() !== '' || filterCategory !== 'all'
+  const groupMap = new Map<string, Transaction[]>()
+  for (const tx of filtered) {
+    const key = tx.date.slice(0, 7)
+    groupMap.set(key, [...(groupMap.get(key) ?? []), tx])
+  }
+  // Keep a "this month" section visible on a fresh month so it isn't silently missing
+  if (!isFiltering && !groupMap.has(currentMonth)) groupMap.set(currentMonth, [])
+  const monthGroups = Array.from(groupMap.entries()).sort(([a], [b]) => b.localeCompare(a))
+
+  // Current month open by default, older months collapsed. Searching or filtering
+  // by category opens everything so matches aren't hidden inside a collapsed month.
+  const isMonthOpen = (key: string) => monthOverrides[key] ?? (isFiltering || key === currentMonth)
+
+  function toggleMonth(key: string) {
+    setMonthOverrides(prev => ({ ...prev, [key]: !isMonthOpen(key) }))
+  }
 
   function getCategoryName(categoryId: string | null) {
     if (!categoryId) return 'Uncategorized'
@@ -117,41 +140,74 @@ export default function TransactionsPage() {
       ) : filtered.length === 0 ? (
         <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">No transactions yet.</div>
       ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          {filtered.map((tx, i) => (
-            <div key={tx.id} className={`flex items-center justify-between px-5 py-3.5 hover:bg-white/3 transition-colors ${i < filtered.length - 1 ? 'border-b border-border' : ''}`}>
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(tx.category_id) }} />
-                <div>
-                  <p className="text-sm font-medium">{tx.description || getCategoryName(tx.category_id)}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-muted-foreground">{format(new Date(tx.date + 'T00:00:00'), 'MMM d, yyyy')}</span>
-                    <Badge variant="outline" className="text-xs border-white/10 text-muted-foreground">
-                      {getCategoryName(tx.category_id)}
-                    </Badge>
+        <div className="space-y-4">
+          {monthGroups.map(([key, txs]) => {
+            const open = isMonthOpen(key)
+            const spent = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+            return (
+              <div key={key} className="bg-card border border-border rounded-xl overflow-hidden">
+                <button
+                  onClick={() => toggleMonth(key)}
+                  aria-expanded={open}
+                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-white/3 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {open
+                      ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                    <span className="text-sm font-semibold">{format(new Date(key + '-01T00:00:00'), 'MMMM yyyy')}</span>
+                    {key === currentMonth && (
+                      <Badge variant="outline" className="text-xs border-blue-500/30 text-blue-400">This month</Badge>
+                    )}
                   </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`font-semibold text-sm ${tx.type === 'saving' ? 'text-blue-400' : 'text-foreground'}`}>
-                  {formatCurrency(tx.amount)}
-                </span>
-                <button
-                  onClick={() => { setEditingTx(tx); setDialogOpen(true) }}
-                  className="text-muted-foreground hover:text-blue-400 transition-colors"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{txs.length} {txs.length === 1 ? 'transaction' : 'transactions'}</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(spent)}</span>
+                  </div>
                 </button>
-                <button
-                  onClick={() => handleDelete(tx.id)}
-                  disabled={deleting === tx.id}
-                  className="text-xs text-muted-foreground hover:text-red-400 transition-colors"
-                >
-                  {deleting === tx.id ? '...' : 'Delete'}
-                </button>
+                {open && (
+                  <div className="border-t border-border">
+                    {txs.length === 0 ? (
+                      <p className="px-5 py-4 text-sm text-muted-foreground">No transactions yet this month.</p>
+                    ) : txs.map((tx, i) => (
+                      <div key={tx.id} className={`flex items-center justify-between px-5 py-3.5 hover:bg-white/3 transition-colors ${i < txs.length - 1 ? 'border-b border-border' : ''}`}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(tx.category_id) }} />
+                          <div>
+                            <p className="text-sm font-medium">{tx.description || getCategoryName(tx.category_id)}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-muted-foreground">{format(new Date(tx.date + 'T00:00:00'), 'MMM d, yyyy')}</span>
+                              <Badge variant="outline" className="text-xs border-white/10 text-muted-foreground">
+                                {getCategoryName(tx.category_id)}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`font-semibold text-sm ${tx.type === 'saving' ? 'text-blue-400' : 'text-foreground'}`}>
+                            {formatCurrency(tx.amount)}
+                          </span>
+                          <button
+                            onClick={() => { setEditingTx(tx); setDialogOpen(true) }}
+                            className="text-muted-foreground hover:text-blue-400 transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(tx.id)}
+                            disabled={deleting === tx.id}
+                            className="text-xs text-muted-foreground hover:text-red-400 transition-colors"
+                          >
+                            {deleting === tx.id ? '...' : 'Delete'}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
