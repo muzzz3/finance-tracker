@@ -19,15 +19,9 @@ interface Subscription {
   amount: number
   billing_cycle: 'monthly' | 'yearly'
   next_billing_date: string | null
-  color: string | null
   active: boolean
   category_id: string | null
 }
-
-const COLORS = [
-  '#60a5fa', '#34d399', '#f59e0b', '#f87171', '#a78bfa',
-  '#fb923c', '#e879f9', '#94a3b8', '#38bdf8', '#4ade80',
-]
 
 const monthlyAmount = (s: Subscription) =>
   s.billing_cycle === 'yearly' ? s.amount / 12 : s.amount
@@ -44,7 +38,6 @@ export default function SubscriptionsPage() {
   const [amount, setAmount] = useState('')
   const [cycle, setCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [nextDate, setNextDate] = useState('')
-  const [color, setColor] = useState(COLORS[0])
   const [categoryId, setCategoryId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -71,7 +64,7 @@ export default function SubscriptionsPage() {
 
   function openAdd() {
     setEditing(null)
-    setName(''); setAmount(''); setCycle('monthly'); setNextDate(''); setColor(COLORS[0]); setCategoryId(''); setError('')
+    setName(''); setAmount(''); setCycle('monthly'); setNextDate(''); setCategoryId(''); setError('')
     setDialogOpen(true)
   }
 
@@ -81,7 +74,6 @@ export default function SubscriptionsPage() {
     setAmount(String(s.amount))
     setCycle(s.billing_cycle)
     setNextDate(s.next_billing_date ?? '')
-    setColor(s.color ?? COLORS[0])
     setCategoryId(s.category_id ?? '')
     setError('')
     setDialogOpen(true)
@@ -97,7 +89,6 @@ export default function SubscriptionsPage() {
       amount: parseFloat(amount),
       billing_cycle: cycle,
       next_billing_date: nextDate || null,
-      color,
       category_id: categoryId || null,
       updated_at: new Date().toISOString(),
     }
@@ -139,6 +130,12 @@ export default function SubscriptionsPage() {
       return parent ? `${parent.name} → ${cat.name}` : cat.name
     }
     return cat.name
+  }
+
+  // A subscription's dot is always its category's color (same as transactions),
+  // so a color maps to one category everywhere. Slate for uncategorized.
+  function categoryColor(catId: string | null): string {
+    return (catId && categoryById.get(catId)?.color) || '#64748b'
   }
 
   // Child categories roll up into their parent's group, same as the
@@ -220,6 +217,7 @@ export default function SubscriptionsPage() {
                       <SubRow
                         key={s.id}
                         s={s}
+                        dotColor={categoryColor(s.category_id)}
                         subLabel={categoryLabel(s.category_id) !== categoryById.get(catId)?.name ? categoryLabel(s.category_id) : null}
                         last={i === items.length - 1}
                         onEdit={() => openEdit(s)}
@@ -242,6 +240,7 @@ export default function SubscriptionsPage() {
                     <SubRow
                       key={s.id}
                       s={s}
+                      dotColor={categoryColor(null)}
                       subLabel={null}
                       last={i === groupedActive[''].length - 1}
                       onEdit={() => openEdit(s)}
@@ -262,6 +261,7 @@ export default function SubscriptionsPage() {
                     <SubRow
                       key={s.id}
                       s={s}
+                      dotColor={categoryColor(s.category_id)}
                       subLabel={categoryLabel(s.category_id)}
                       last={i === paused.length - 1}
                       onEdit={() => openEdit(s)}
@@ -339,20 +339,6 @@ export default function SubscriptionsPage() {
               <Label className="text-slate-300">Next billing date (optional)</Label>
               <DatePicker value={nextDate} onChange={setNextDate} />
             </div>
-            <div className="space-y-2">
-              <Label className="text-slate-300">Color</Label>
-              <div className="flex gap-2 flex-wrap">
-                {COLORS.map(c => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setColor(c)}
-                    className="w-7 h-7 rounded-full transition-transform hover:scale-110"
-                    style={{ backgroundColor: c, outline: color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
-                  />
-                ))}
-              </div>
-            </div>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <div className="flex gap-2 justify-end pt-1">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="border-white/10 text-slate-300">Cancel</Button>
@@ -367,8 +353,9 @@ export default function SubscriptionsPage() {
   )
 }
 
-function SubRow({ s, subLabel, last, onEdit, onDelete, onToggle }: {
+function SubRow({ s, dotColor, subLabel, last, onEdit, onDelete, onToggle }: {
   s: Subscription
+  dotColor: string
   subLabel: string | null
   last: boolean
   onEdit: () => void
@@ -381,7 +368,7 @@ function SubRow({ s, subLabel, last, onEdit, onDelete, onToggle }: {
   return (
     <div className={`px-5 py-3.5 flex items-center justify-between hover:bg-white/2 transition-colors ${!last ? 'border-b border-white/6' : ''}`}>
       <div className="flex items-center gap-3">
-        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color ?? '#94a3b8', opacity: s.active ? 1 : 0.4 }} />
+        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: dotColor, opacity: s.active ? 1 : 0.4 }} />
         <div>
           <p className={`text-sm font-medium ${s.active ? 'text-slate-200' : 'text-slate-500'}`}>{s.name}</p>
           <p className="text-xs text-slate-600">

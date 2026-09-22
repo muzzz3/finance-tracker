@@ -104,6 +104,19 @@ export default function DashboardPage() {
   }, new Map<string, number>())
   const uncategorizedSubMonthly = activeSubs.filter(s => !s.category_id).reduce((sum, s) => sum + subMonthlyOf(s), 0)
 
+  // Total for a top-level category, rolling up its children's transactions +
+  // subscriptions (a category with children can't receive either directly —
+  // AddTransactionDialog and the Subscriptions form both only offer its
+  // children). Generalizes what used to be a Food-only special case so any
+  // parent/child category (e.g. Family -> per-member) works the same way.
+  function categoryTotal(cat: Category): number {
+    const children = categories.filter(c => c.parent_id === cat.id)
+    if (children.length > 0) {
+      return children.reduce((s, c) => s + (grouped.get(c.id)?.total ?? 0) + (subsByCategory.get(c.id) ?? 0), 0)
+    }
+    return (grouped.get(cat.id)?.total ?? 0) + (subsByCategory.get(cat.id) ?? 0)
+  }
+
   const txExpenses = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const totalExpenses = txExpenses + subMonthly
   const paycheckSavings = earnings - totalExpenses - k401 - roth - stocks
@@ -116,26 +129,12 @@ export default function DashboardPage() {
   }
 
   const expenseDonutData = [
-    ...expenseTopLevel.map(cat => {
-      const subAmount = subsByCategory.get(cat.id) ?? 0
-      if (cat.id === foodParent?.id) {
-        const total = foodChildren.reduce((s, c) => s + (grouped.get(c.id)?.total ?? 0), 0)
-        return { name: 'Food', value: total + subAmount, color: cat.color ?? '#f97316' }
-      }
-      return { name: cat.name, value: (grouped.get(cat.id)?.total ?? 0) + subAmount, color: cat.color ?? '#888' }
-    }),
+    ...expenseTopLevel.map(cat => ({ name: cat.name, value: categoryTotal(cat), color: cat.color ?? '#888' })),
     ...(uncategorizedSubMonthly > 0 ? [{ name: 'Subscriptions', value: uncategorizedSubMonthly, color: '#38bdf8' }] : []),
   ]
 
   const allocationDonutData = [
-    ...expenseTopLevel.map(cat => {
-      const subAmount = subsByCategory.get(cat.id) ?? 0
-      if (cat.id === foodParent?.id) {
-        const total = foodChildren.reduce((s, c) => s + (grouped.get(c.id)?.total ?? 0), 0)
-        return { name: 'Food', value: total + subAmount, color: cat.color ?? '#f97316' }
-      }
-      return { name: cat.name, value: (grouped.get(cat.id)?.total ?? 0) + subAmount, color: cat.color ?? '#888' }
-    }),
+    ...expenseTopLevel.map(cat => ({ name: cat.name, value: categoryTotal(cat), color: cat.color ?? '#888' })),
     ...(uncategorizedSubMonthly > 0 ? [{ name: 'Subscriptions', value: uncategorizedSubMonthly, color: '#38bdf8' }] : []),
     ...(k401 > 0 ? [{ name: '401k', value: k401, color: '#a78bfa' }] : []),
     ...(roth > 0 ? [{ name: 'Roth IRA', value: roth, color: '#8b5cf6' }] : []),
@@ -148,7 +147,7 @@ export default function DashboardPage() {
   const sortedExpenseList = (() => {
     const items = expenseTopLevel.filter(c => c.id !== foodParent?.id).map(cat => ({
       cat,
-      total: (grouped.get(cat.id)?.total ?? 0) + (subsByCategory.get(cat.id) ?? 0),
+      total: categoryTotal(cat),
     }))
     if (expenseListSort === 'name') return [...items].sort((a, b) => a.cat.name.localeCompare(b.cat.name))
     if (expenseListSort === 'asc') return [...items].sort((a, b) => a.total - b.total)
