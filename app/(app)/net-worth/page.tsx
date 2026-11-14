@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useRealtimeRefresh } from '@/lib/use-realtime-refresh'
 import { formatCurrency } from '@/lib/finance'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -93,6 +94,8 @@ export default function NetWorthPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  useRealtimeRefresh('accounts', fetchData)
 
   // Auto-capture this month's net worth snapshot whenever balances change.
   // Upsert keeps a single row per month fresh with the latest totals rather

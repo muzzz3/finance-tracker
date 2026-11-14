@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { Plus, Pencil, Search, ChevronDown, ChevronRight } from 'lucide-react'
 import Fuse from 'fuse.js'
 import { createClient } from '@/lib/supabase/client'
+import { useRealtimeRefresh } from '@/lib/use-realtime-refresh'
 import { formatCurrency } from '@/lib/finance'
 import type { Category, Transaction } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -38,6 +39,8 @@ export default function TransactionsPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  useRealtimeRefresh('transactions', fetchData)
 
   async function handleDelete(id: string) {
     setDeleting(id)
