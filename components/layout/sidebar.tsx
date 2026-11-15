@@ -4,12 +4,13 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, ArrowLeftRight, BarChart2, LogOut, TrendingUp, Landmark, ShoppingBag, Wallet, Repeat2, Eye, EyeOff } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, BarChart2, LogOut, TrendingUp, Landmark, ShoppingBag, Wallet, Repeat2, Eye, EyeOff, Target } from 'lucide-react'
 import { usePrivacyMode } from '@/lib/privacy-mode'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { href: '/budget', label: 'Budget', icon: Target },
   { href: '/income', label: 'Income', icon: Wallet },
   { href: '/subscriptions', label: 'Recurring Payments', icon: Repeat2 },
   { href: '/net-worth', label: 'Net Worth', icon: Landmark },
